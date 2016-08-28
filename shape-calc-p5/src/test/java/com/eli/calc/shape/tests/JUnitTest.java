@@ -9,24 +9,26 @@ import java.util.Map;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
-import org.springframework.context.support.ClassPathXmlApplicationContext;
-
 import com.eli.calc.shape.config.AppConfig;
 import com.eli.calc.shape.domain.CalculationRequest;
 import com.eli.calc.shape.domain.CalculationResult;
 import com.eli.calc.shape.model.CalcType;
 import com.eli.calc.shape.model.ShapeName;
 import com.eli.calc.shape.service.ShapeCalculatorService;
-import com.eli.calc.shape.service.impl.ShapeCalculatorServiceImpl;
 
 public class JUnitTest {
 
 	private ApplicationContext ctx;
 	private ShapeCalculatorService calculator;
+	
+	@Rule
+	public ExpectedException illegalArgThrown = ExpectedException.none();
 	
 	@Before
 	public void setUp() throws Exception {
@@ -47,37 +49,25 @@ public class JUnitTest {
 	@Test
 	public void testQueueRequestWithNullShapeName() {
 		
-		try {
-			double dimension = 0;
-			calculator.queueCalculationRequest(null, CalcType.CALC_AREA, dimension);
-		} catch (IllegalArgumentException e) {
-			return;
-		}
-		fail("Null ShapeName should have caused an exception");
+		illegalArgThrown.expect(IllegalArgumentException.class);
+		double dimension = 0;
+		calculator.queueCalculationRequest(null, CalcType.CALC_AREA, dimension);
 	}
 
 	@Test
 	public void testQueueRequestWithNullCalcType() {
 		
-		try {
-			double dimension = 0;
-			calculator.queueCalculationRequest(ShapeName.CIRCLE, null, dimension);
-		} catch (IllegalArgumentException e) {
-			return;
-		}
-		fail("Null CalcType should have caused an exception");
+		illegalArgThrown.expect(IllegalArgumentException.class);
+		double dimension = 0;
+		calculator.queueCalculationRequest(ShapeName.CIRCLE, null, dimension);
 	}
 
 	@Test
 	public void testQueueRequestWithNegativeDimension() {
 		
-		try {
-			double dimension = -0.01;
-			calculator.queueCalculationRequest(ShapeName.CIRCLE, CalcType.CALC_AREA, dimension);
-		} catch (IllegalArgumentException e) {
-			return;
-		}
-		fail("Negative dimension should have caused an exception");
+		illegalArgThrown.expect(IllegalArgumentException.class);
+		double dimension = -0.01;
+		calculator.queueCalculationRequest(ShapeName.CIRCLE, CalcType.CALC_AREA, dimension);
 	}
 
 	@Test
