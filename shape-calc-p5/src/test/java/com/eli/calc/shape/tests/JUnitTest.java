@@ -353,32 +353,41 @@ public class JUnitTest {
 		}
 
 		double counter = 0.0;
-		double loopMax = 4;
+		double loopMax = 100;
+		double incThousanths = 0.001; double thousands = 1000;
+		double incHundredths = 0.01; double hundreds = 100;
+		double incTenths     = 0.1; double tens = 10;
+		double incOnes       = 1;   double ones = 1;
 
+		//double incDecimalFactor = incOnes; double placeValue = ones;
+		double incDecimalFactor = incTenths; double placeValue = tens;
+		
+		double expectedNumResults1 = loopMax * placeValue;
+		
 		Runnable deleteAllRequestsTask = () -> {
 			logger.debug("\n\ndelete\n\n");
-			for (double dimension=counter; dimension<loopMax; dimension+=0.0001) {
+			for (double dimension=counter; dimension<loopMax; dimension+=incHundredths) {
 				calculator.deleteAllPendingRequests();
 			}
 		};
 		
 		Runnable addRequestsTask = () -> {
-			for (double dimension=counter; dimension<loopMax; dimension+=0.001) {
+			for (double dimension=counter; dimension<loopMax; dimension+=incDecimalFactor) {
 				logger.debug("\n\n"+dimension+"\n\n");
 				calculator.queueCalculationRequest(ShapeName.CIRCLE, CalcType.CALC_AREA, dimension);
 			}
 		};
 
 		Runnable addRequestsTask2 = () -> {
-			for (double dimension=counter; dimension<loopMax; dimension+=0.001) {
+			for (double dimension=counter; dimension<loopMax; dimension+=incDecimalFactor) {
 				logger.debug("\n\n"+dimension+"\n\n");
 				calculator.queueCalculationRequest(ShapeName.SQUARE, CalcType.CALC_VOLUME, dimension);
 			}
 		};
 
 		Runnable runAllRequestsNoStopTask = () -> {
-			for (double dimension=counter; dimension<loopMax; dimension+=0.01) {
-				logger.debug("\n\n"+dimension+"\n\n");
+			for (double dimension=counter; dimension<loopMax; dimension+=incDecimalFactor) {
+				logger.debug("\n\nrun\n\n");
 				calculator.runAllPendingRequestsNoStopOnError();
 			}
 		};
@@ -401,11 +410,15 @@ public class JUnitTest {
 			t.start();
 		}
 
+		logger.debug("\n\nMain thread has started child threads..waiting...\n\n");
+
 		//wait until all threads are in position to start
 		// each thread will count down the ready latch, and main thread will
 		// move beyond this point
 		try { readyLatch.await(); } catch (InterruptedException ie) {}
 		
+		logger.debug("\n\nAll child threads read to run - Main thread will set them off.....\n\n");
+
 
 		//now the main thread will count down the start latch, so that the
 		//task threads can all leave the starting gate
@@ -413,9 +426,19 @@ public class JUnitTest {
 			startLatch.countDown();
 		}
 	
+		logger.debug("\n\nMain thread waiting for child threads to finish.....\n\n");
+
 		//now the main thread must wait (to exit)
 		//until all the task threads are done
 		try { stopLatch.await(); } catch (InterruptedException ie) {}
+		
+		logger.debug("\n\nMain thread testing some results.....\n\n");
+
+		List<CalculationResult> results = calculator.getAllCalculationResults();
+		assertNotNull(results);
+		assertEquals((expectedNumResults1*2) ,results.size(),0.0);
+
+	
 	}
 
 }
