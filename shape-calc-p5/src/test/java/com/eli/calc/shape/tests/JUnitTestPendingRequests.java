@@ -72,7 +72,7 @@ public class JUnitTestPendingRequests {
 			}
 		}
 
-		int loopMax = 100;
+		int loopMax = 100000;
 
 		Runnable deleteAllRequestsTask = () -> {
 			logger.debug("\n\ndelete\n\n");
