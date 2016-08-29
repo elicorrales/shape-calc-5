@@ -1,17 +1,16 @@
 package com.eli.calc.shape.tests;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.FixMethodOrder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -20,13 +19,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
+
 import com.eli.calc.shape.config.AppConfig;
 import com.eli.calc.shape.domain.CalculationRequest;
 import com.eli.calc.shape.domain.CalculationResult;
 import com.eli.calc.shape.model.CalcType;
 import com.eli.calc.shape.model.ShapeName;
 import com.eli.calc.shape.service.ShapeCalculatorService;
-import com.eli.calc.shape.service.impl.PendingRequestsImpl;
 
 public class JUnitTest {
 
@@ -354,22 +353,13 @@ public class JUnitTest {
 
 		double counter = 0.0;
 		double loopMax = 100;
-		double incThousanths = 0.001; double thousands = 1000;
-		double incHundredths = 0.01; double hundreds = 100;
+		double incOnes     = 1; double ones = 1;
 		double incTenths     = 0.1; double tens = 10;
-		double incOnes       = 1;   double ones = 1;
 
-		//double incDecimalFactor = incOnes; double placeValue = ones;
-		double incDecimalFactor = incTenths; double placeValue = tens;
+		double incDecimalFactor = incOnes; double placeValue = ones;
+		//double incDecimalFactor = incTenths; double placeValue = tens;
 		
 		double expectedNumResults1 = loopMax * placeValue;
-		
-		Runnable deleteAllRequestsTask = () -> {
-			logger.debug("\n\ndelete\n\n");
-			for (double dimension=counter; dimension<loopMax; dimension+=incHundredths) {
-				calculator.deleteAllPendingRequests();
-			}
-		};
 		
 		Runnable addRequestsTask = () -> {
 			for (double dimension=counter; dimension<loopMax; dimension+=incDecimalFactor) {
@@ -393,7 +383,6 @@ public class JUnitTest {
 		};
 
 		final List<LatchedThread> threads = new ArrayList<LatchedThread>();
-		//new LatchedThread(deleteAllRequestsTask,threads);
 		new LatchedThread(addRequestsTask,threads);
 		new LatchedThread(addRequestsTask2,threads);
 		new LatchedThread(runAllRequestsNoStopTask,threads);

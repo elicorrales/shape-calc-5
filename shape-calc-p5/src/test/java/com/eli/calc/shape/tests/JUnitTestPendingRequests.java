@@ -1,6 +1,6 @@
 package com.eli.calc.shape.tests;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.eli.calc.shape.domain.CalculationRequest;
-import com.eli.calc.shape.domain.CalculationResult;
 import com.eli.calc.shape.model.CalcType;
 import com.eli.calc.shape.model.ShapeName;
 import com.eli.calc.shape.service.PendingRequests;
