@@ -2,9 +2,12 @@ package com.eli.calc.shape.tests;
 
 import static org.junit.Assert.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
@@ -12,6 +15,8 @@ import org.junit.FixMethodOrder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -21,8 +26,11 @@ import com.eli.calc.shape.domain.CalculationResult;
 import com.eli.calc.shape.model.CalcType;
 import com.eli.calc.shape.model.ShapeName;
 import com.eli.calc.shape.service.ShapeCalculatorService;
+import com.eli.calc.shape.service.impl.PendingRequestsImpl;
 
 public class JUnitTest {
+
+	private static final Logger logger = LoggerFactory.getLogger(JUnitTest.class);
 
 	private ApplicationContext ctx;
 	private ShapeCalculatorService calculator;
@@ -44,6 +52,37 @@ public class JUnitTest {
 	@After
 	public void tearDown() throws Exception {
 		((AbstractApplicationContext)ctx).close();
+	}
+
+	@Test
+	public void testDeleteAllResults() {
+		calculator.deleteAllResults();
+	}
+
+	@Test
+	public void testQueueCalculationRequest() {
+		double dimension = 0;
+		calculator.queueCalculationRequest(ShapeName.CIRCLE, CalcType.CALC_AREA, dimension);
+	}
+
+	@Test
+	public void testGetAllPendingRequests() {
+		calculator.getAllPendingRequests();
+	}
+
+	@Test
+	public void testGetAllCalculationResults() {
+		calculator.getAllCalculationResults();
+	}
+
+	@Test
+	public void testRunAllPendingRequestsStopOnError() {
+		calculator.runAllPendingRequestsStopOnError();
+	}
+
+	@Test
+	public void testRunAllPendingRequestsNoStopOnError() {
+		calculator.runAllPendingRequestsNoStopOnError();
 	}
 
 	@Test
@@ -274,36 +313,109 @@ public class JUnitTest {
 		assertEquals(0,results.size());
 	}
 
-
+	
 	@Test
-	public void testDeleteAllResults() {
-		calculator.deleteAllResults();
-	}
+	public void testRequestsForExceptionsDuringPossibleRaceConditions() {
 
-	@Test
-	public void testQueueCalculationRequest() {
-		double dimension = 0;
-		calculator.queueCalculationRequest(ShapeName.CIRCLE, CalcType.CALC_AREA, dimension);
-	}
 
-	@Test
-	public void testGetAllPendingRequests() {
-		calculator.getAllPendingRequests();
-	}
+		// this class will run the Runnable tasks (see further down)
+		// in a coordinated (with main thread) fashion
+		final class LatchedThread extends Thread {
+			private CountDownLatch _readyLatch;
+			private CountDownLatch _startLatch;
+			private CountDownLatch _stopLatch;
+			LatchedThread(Runnable runnable, List<LatchedThread> threads){
+				super(runnable);
+				threads.add(this);
+			}
 
-	@Test
-	public void testGetAllCalculationResults() {
-		calculator.getAllCalculationResults();
-	}
+			void setReadyLatch(CountDownLatch l) { _readyLatch = l; }
 
-	@Test
-	public void testRunAllPendingRequestsStopOnError() {
-		calculator.runAllPendingRequestsStopOnError();
-	}
+			void setStartLatch(CountDownLatch l) { _startLatch = l; }
 
-	@Test
-	public void testRunAllPendingRequestsNoStopOnError() {
-		calculator.runAllPendingRequestsNoStopOnError();
+			void setStopLatch(CountDownLatch l) { _stopLatch = l; }
+
+			public void start() {
+				if (null==_readyLatch) { throw new IllegalArgumentException("_readyLatch not set"); }
+				if (null==_startLatch) { throw new IllegalArgumentException("_startLatch not set"); }
+				if (null==_stopLatch) { throw new IllegalArgumentException("_stopLatch not set"); }
+				super.start();
+			}
+
+			public void run() {
+				try {
+					_readyLatch.countDown(); //this thread signals its readiness 
+					_startLatch.await();     //this thread waits to run
+					super.run();
+					_stopLatch.countDown();  //this thread signals its finished
+				} catch (InterruptedException ie) {}
+			}
+		}
+
+		double counter = 0.0;
+		double loopMax = 4;
+
+		Runnable deleteAllRequestsTask = () -> {
+			logger.debug("\n\ndelete\n\n");
+			for (double dimension=counter; dimension<loopMax; dimension+=0.0001) {
+				calculator.deleteAllPendingRequests();
+			}
+		};
+		
+		Runnable addRequestsTask = () -> {
+			for (double dimension=counter; dimension<loopMax; dimension+=0.001) {
+				logger.debug("\n\n"+dimension+"\n\n");
+				calculator.queueCalculationRequest(ShapeName.CIRCLE, CalcType.CALC_AREA, dimension);
+			}
+		};
+
+		Runnable addRequestsTask2 = () -> {
+			for (double dimension=counter; dimension<loopMax; dimension+=0.001) {
+				logger.debug("\n\n"+dimension+"\n\n");
+				calculator.queueCalculationRequest(ShapeName.SQUARE, CalcType.CALC_VOLUME, dimension);
+			}
+		};
+
+		Runnable runAllRequestsNoStopTask = () -> {
+			for (double dimension=counter; dimension<loopMax; dimension+=0.01) {
+				logger.debug("\n\n"+dimension+"\n\n");
+				calculator.runAllPendingRequestsNoStopOnError();
+			}
+		};
+
+		final List<LatchedThread> threads = new ArrayList<LatchedThread>();
+		//new LatchedThread(deleteAllRequestsTask,threads);
+		new LatchedThread(addRequestsTask,threads);
+		new LatchedThread(addRequestsTask2,threads);
+		new LatchedThread(runAllRequestsNoStopTask,threads);
+
+		CountDownLatch readyLatch = new CountDownLatch(threads.size());
+		CountDownLatch startLatch = new CountDownLatch(threads.size());
+		CountDownLatch stopLatch = new CountDownLatch(threads.size());
+
+		//do the initial start...
+		for (LatchedThread t : threads) {
+			t.setReadyLatch(readyLatch);
+			t.setStartLatch(startLatch);
+			t.setStopLatch(stopLatch);
+			t.start();
+		}
+
+		//wait until all threads are in position to start
+		// each thread will count down the ready latch, and main thread will
+		// move beyond this point
+		try { readyLatch.await(); } catch (InterruptedException ie) {}
+		
+
+		//now the main thread will count down the start latch, so that the
+		//task threads can all leave the starting gate
+		for (Thread t : threads) {
+			startLatch.countDown();
+		}
+	
+		//now the main thread must wait (to exit)
+		//until all the task threads are done
+		try { stopLatch.await(); } catch (InterruptedException ie) {}
 	}
 
 }
